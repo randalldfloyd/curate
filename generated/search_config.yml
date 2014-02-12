@@ -1,0 +1,17 @@
+development:
+  catalog:
+    qf: [all_text_tesim]
+    qt: search
+  people:
+    qf: [desc_metadata_name_ef]
+    fl: desc_metadata__name_tesim id
+    qt: search
+test:
+    qf: [all_text_tesim]
+production:
+  catalog:
+    qf: [desc_metadata__title_tesim,desc_metadata__name_tesim]
+    qt: search
+  people:
+    qf: [desc_metadata__name_tesim]
+    qt: search
