@@ -13,24 +13,30 @@ class Curate::SearchConfigGenerator < Rails::Generators::Base
   desc """
 This generator makes the following changes:
  1. Optionally enables partial searches in SOLR schema using EdgeNGram filtered fields
- 2. Optionally creates a new field in SOLR schema to aggregate metadata fields via a CopyField
- 3. Optionally copies resulting SOLR configuration files to packaged Jetty (if exists)
+ 2. Optionally copies resulting SOLR configuration files to packaged Jetty (if exists)
+ 3. Configures config/search_config.yml with resulting search options to be used by controllers
 """
 
 NGRAM_QUESTION =
 <<-QUESTION_TO_ASK
 Would you like to enable partial term matches for searches in your SOLR configuration?
  
-This will create a new field type using EdgeNGram filters, which might impact index sizes.
-QUESTION_TO_ASK
+This will create fields that use EdgeNGram filters, which might impact index sizes.
 
-TEXT_QUESTION =
-<<-QUESTION_TO_ASK
-Would you like to create an aggregated index field in your SOLR configuration
-for keyword searches?
- 
 This will instruct SOLR to copy a configurable list of fields into a single
 field for keyword searching instead of searching fields individually.
+
+QUESTION_TO_ASK
+
+PARTIAL_SEARCH_QUESTION =
+<<-QUESTION_TO_ASK
+Would you like to enable partial term matches for searches in your SOLR configuration?
+ 
+This will create fields that use EdgeNGram filters, which might impact index sizes.
+
+This will instruct SOLR to copy a configurable list of fields into a single
+field for keyword searching instead of searching fields individually.
+
 QUESTION_TO_ASK
 
 JETTY_SOLR_QUESTION =
@@ -97,31 +103,54 @@ Please review files in ./solr_conf/conf. Changes are commented with the phrase
 'created during Curate installation'. If you are using an external instance of
 SOLR or chose not to copy resulting files to Jetty, then you must review/copy
 the configuration files appropriately for your situation.
+
+Also consult the changes to 'config/search_config'. This file is used to determine
+SOLR options set in search controllers.
 BLOCK
+
+  def prepare_yaml_file
+    banner = "\n" + "*" * 80 + "\n"
+    puts banner
+    say_status("Preparing","Preparing search configuration files...", :green)
+    puts banner
+    yamlfile = Rails.root.join("config","search_config.yml")
+    qt_option = "    qt: search\n"
+    inject_into_file yamlfile, qt_option, after: /.*.\scatalog:\n/, force: true
+    inject_into_file yamlfile, qt_option, after: /.*.\speople:\n/, force: true
+  end
 
   def config_edge_filters
     myfile = Rails.root.join("solr_conf","conf","schema.xml")
     config_target = /.*A text field with defaults appropriate for English --\>\n/
-    if yes_with_banner?(NGRAM_QUESTION)
-      say_status(".....", "Configuring SOLR to enable EdgeNGramFilterFactory fields", :green)
-      say_status(".....", "Making changes to "+myfile.to_s, :green)
-      inject_into_file myfile, EDGE_FILTER_CONFIG, before: config_target
-    end
+    say_status(".....", "Configuring SOLR with an EdgeNGramFilterFactory field type", :green)
+    say_status(".....", "Making changes to "+myfile.to_s, :green)
+    inject_into_file myfile, EDGE_FILTER_CONFIG, before: config_target
   end
 
-  def config_aggregate
+  def config_partial_search
     myschema = Rails.root.join("solr_conf","conf","schema.xml")
     myconfig = Rails.root.join("solr_conf","conf","solrconfig.xml")
+    yamlfile = Rails.root.join("config","search_config.yml")
     schema_target = /.*\<\/fields\>.*\n/
     schema_target = /.*\<\/fields\>.*\n/
-    if yes_with_banner?(TEXT_QUESTION)
+    catalog_qf_opts = 'desc_metadata__title_tesim,desc_metadata__name_tesim'
+    people_qf_opts = 'desc_metadata__name_tesim'
+    if yes_with_banner?(PARTIAL_SEARCH_QUESTION)
+      say_status(".....", "Configuring SOLR to return partial matches for searches", :green)
       say_status(".....", "Configuring SOLR to aggregate fields for keyword searches", :green)
       say_status(".....", "About to make changes to "+myschema.to_s+" and "+myconfig.to_s, :green)
       inject_into_file myschema, AGGREGATE_CONFIG, before: schema_target
       inject_into_file myschema, COPYFIELD_CONFIG, after: schema_target
       inject_into_file myconfig, "          all_text_tesim\n", after: /.*\<str name="qf"\>\n.*id\n/
       inject_into_file myconfig, "          all_text_tesim^10\n", after: /.*\<str name="pf"\>\n/
+      catalog_qf_opts = 'all_text_tesim'
+      people_qf_opts = 'desc_metadata_name_ef'
+    else
+      say_status(".....", "SOLR will not return partial matches for searches", :green)
     end
+    inject_into_file yamlfile, "    qf: [#{catalog_qf_opts}]\n", after: /.\scatalog:\n/
+    inject_into_file yamlfile, "    fl: desc_metadata__name_tesim id\n", after: /.\speople:\n/
+    inject_into_file yamlfile, "    qf: [#{people_qf_opts}]\n", after: /.\speople:\n/
   end
 
   def copy_solr_configs
