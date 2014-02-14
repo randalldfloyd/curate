@@ -39,7 +39,7 @@ class CatalogController < ApplicationController
   def self.search_config
      initialized_config = Curate.configuration.search_config['catalog']
      if initialized_config.nil?
-        Hash['qf' => 'desc_metadata__title_tesim','qt' => 'search','rows' => 10]
+        Hash['qf' => ['desc_metadata__title_tesim','desc_metadata__name_tesim'],'qt' => 'search','rows' => 10]
      else
         initialized_config
      end
