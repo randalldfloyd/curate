@@ -37,7 +37,11 @@ class CatalogController < ApplicationController
   end
 
   def self.search_config
+     # Set parameters to send to SOLR
+     # First inspect contents of the hash from Yaml configuration file
+     # See config/search_config.yml
      initialized_config = Curate.configuration.search_config['catalog']
+     # If the hash is empty, set reasonable defaults for this search type
      if initialized_config.nil?
         Hash['qf' => ['desc_metadata__title_tesim','desc_metadata__name_tesim'],'qt' => 'search','rows' => 10]
      else

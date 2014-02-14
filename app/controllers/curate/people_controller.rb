@@ -12,9 +12,13 @@ class Curate::PeopleController < ApplicationController
   self.solr_search_params_logic += [:only_users]
 
   def self.search_config
+     # Set parameters to send to SOLR
+     # First inspect contents of the hash from Yaml configuration file
+     # See config/search_config.yml
      initialized_config = Curate.configuration.search_config['people']
+     # If the hash is empty, set reasonable defaults for this search type
      if initialized_config.nil?
-        Hash['qf' => 'desc_metadata__name_tesim','fl' => 'desc_metadata__name_tesim id','qt' => 'search','rows' => 30]
+        Hash['qf' => 'desc_metadata__name_tesim','fl' => 'desc_metadata__name_tesim id','qt' => 'search','rows' => 10]
      else
         initialized_config
      end
